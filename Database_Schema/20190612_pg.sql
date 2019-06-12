@@ -951,3 +951,7 @@ ALTER TABLE ONLY public.balance
 -- PostgreSQL database dump complete
 --
 
+-- 
+-- Developer: Vikram More
+-- Desc: Database for margin calculations
+--
