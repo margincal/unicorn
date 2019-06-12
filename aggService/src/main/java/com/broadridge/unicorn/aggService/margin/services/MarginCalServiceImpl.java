@@ -8,10 +8,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +28,7 @@ import com.broadridge.unicorn.aggService.beans.RateRequirementBean;
 import com.broadridge.unicorn.aggService.beans.UnitRequirementBean;
 import com.broadridge.unicorn.aggService.domain.Position;
 import com.broadridge.unicorn.aggService.domain.StraddleStrategyDTO;
+import com.broadridge.unicorn.aggService.domain.UniversalSpreadStrategyDTO;
 
 @Service("marginCalService")
 public class MarginCalServiceImpl implements MarginCalService {
@@ -63,6 +68,7 @@ public class MarginCalServiceImpl implements MarginCalService {
 					if(securityClass !=null && securityClass.equalsIgnoreCase("O"))
 					{
 						rateRequirementsMap=getRatesRequirements(conn, stmt,accountid,date,securityClass);
+		/*
 						if(positionsList==2)
 						{
 							boolean isEligible=isItEligibleforStraddle( conn,  stmt, accountid);
@@ -129,6 +135,16 @@ public class MarginCalServiceImpl implements MarginCalService {
 							MarginCalBean marginCalBean = performEscrewRecieptCalculation(conn,stmt,accountid,date,rateRequirementsMap);
 							conversionsMarginCalResponse.setMargin(marginCalBean);
 							strategyCalResponseMap.putIfAbsent("EscrewReciept", conversionsMarginCalResponse);							
+						}
+						
+			*/
+						if (isItEligibleforUniversalSpread(conn, stmt, accountid)) {
+							MarginCalResponseBean universalSpreadMarginCalResponse= new MarginCalResponseBean();
+							MarginCalBean marginCalBean = performUniversalSpreadCalculation(conn,stmt,accountid,date,rateRequirementsMap);
+							universalSpreadMarginCalResponse.setMargin(marginCalBean);
+							// strategyCalResponseMap.putIfAbsent("EscrewReciept", conversionsMarginCalResponse);	
+							
+							
 						}
 					}
 				} catch (SQLException e) {
@@ -1028,4 +1044,50 @@ public class MarginCalServiceImpl implements MarginCalService {
 		
 		return marginCalBean;
 	}
+	
+	private boolean isItEligibleforUniversalSpread(Connection conn, Statement stmt, String accountId) {
+		
+		return true;
+		
+	}
+	
+	private MarginCalBean performUniversalSpreadCalculation(Connection conn, Statement stmt, String accountId, String date, Map<String,RateRequirementBean> rateRequirementsMap)throws SQLException
+	{
+		MarginCalBean marginCalBean= new MarginCalBean();
+
+		Set<Double>  strikePriceSet = new TreeSet<>();
+		
+		List<UniversalSpreadStrategyDTO> uspreadDtoList = new ArrayList<>();
+		
+		String universalSpreadDataQry = "select po.account_id,po.price,po.strikepriceamount,po.callputind,po.optfactor,pd.\"TradeDateQuantity\" as quantity" 
+				                         + ",po.symbol,pr.price as stock_price, po.expirationdate from"
+				                         + " position po , positiondetail pd, price pr"
+				                         + " where po.position_id=pd.position_id and po.account_id='" + accountId + "'" ;
+
+		ResultSet result = stmt.executeQuery(universalSpreadDataQry);
+		while(result.next())
+		{
+			UniversalSpreadStrategyDTO uspreadDto = new UniversalSpreadStrategyDTO();
+			uspreadDto.setAccountId(result.getString("account_id"));
+			uspreadDto.setPrice(result.getDouble("price"));
+			uspreadDto.setStrikepriceamount(result.getDouble("strikepriceamount"));
+			uspreadDto.setCallputind(result.getString("callputind"));
+			uspreadDto.setOptfactor(result.getDouble("optfactor"));
+			uspreadDto.setQuantity(result.getDouble("quantity"));
+			uspreadDto.setStockPrice(result.getDouble("stock_price"));
+			uspreadDto.setExpirationDate(result.getString("expirationdate"));
+			uspreadDtoList.add(uspreadDto);
+			
+			strikePriceSet.add(result.getDouble("stock_price")); // Temporary using stock price as strike price.
+		}
+		
+		for (Double strikePrice: strikePriceSet){
+			System.out.println("uniqueStrikePrice: " + strikePrice);
+		}
+		
+		
+		return marginCalBean;
+		
+	}
+
 }
